@@ -11,7 +11,15 @@ import Accounts from "./pages/Accounts";
 import Employees from "./pages/Employees";
 import Attendance from "./pages/Attendance";
 import Invoices from "./pages/Invoices";
-import Rentals from "./pages/Rentals";
+import RentalDashboard from "./pages/rentals/Dashboard";
+import RentalCustomers from "./pages/rentals/Customers";
+import RentalAttributes from "./pages/rentals/Attributes";
+import RentalBrand from "./pages/rentals/Brand";
+import RentalMainType from "./pages/rentals/MainType";
+import RentalSubType from "./pages/rentals/SubType";
+import RentalStockReport from "./pages/rentals/StockReport";
+import RentalOrders from "./pages/rentals/Orders";
+import RentalListOrders from "./pages/rentals/ListOrders";
 import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
@@ -32,7 +40,16 @@ const App = () => (
               <Route path="/employees" element={<Employees />} />
               <Route path="/attendance" element={<Attendance />} />
               <Route path="/invoices" element={<Invoices />} />
-              <Route path="/rentals" element={<Rentals />} />
+              <Route path="/rentals" element={<RentalDashboard />} />
+              <Route path="/rentals/dashboard" element={<RentalDashboard />} />
+              <Route path="/rentals/customers" element={<RentalCustomers />} />
+              <Route path="/rentals/attributes" element={<RentalAttributes />} />
+              <Route path="/rentals/brand" element={<RentalBrand />} />
+              <Route path="/rentals/main-type" element={<RentalMainType />} />
+              <Route path="/rentals/sub-type" element={<RentalSubType />} />
+              <Route path="/rentals/stock-report" element={<RentalStockReport />} />
+              <Route path="/rentals/orders" element={<RentalOrders />} />
+              <Route path="/rentals/list-orders" element={<RentalListOrders />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
