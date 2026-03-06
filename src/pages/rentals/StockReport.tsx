@@ -28,6 +28,19 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import {
     BarChart2,
     Plus,
     Search,
@@ -35,9 +48,11 @@ import {
     CheckCircle,
     AlertTriangle,
     History,
-    TrendingUp,
     Filter,
+    Check,
+    ChevronsUpDown,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { db } from "@/lib/firebase";
 import { ref, push, onValue } from "firebase/database";
 import { motion, AnimatePresence } from "framer-motion";
@@ -77,6 +92,16 @@ const StockReport = () => {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
+
+    // Combobox open states
+    const [openBrand, setOpenBrand] = useState(false);
+    const [openMainType, setOpenMainType] = useState(false);
+    const [openSubType, setOpenSubType] = useState(false);
+
+    // Combobox search states
+    const [brandSearch, setBrandSearch] = useState("");
+    const [mainTypeSearch, setMainTypeSearch] = useState("");
+    const [subTypeSearch, setSubTypeSearch] = useState("");
 
     // Form state
     const [formData, setFormData] = useState({
@@ -145,6 +170,24 @@ const StockReport = () => {
         return Object.values(groups).reverse();
     }, [items]);
 
+    const { uniqueBrands, uniqueMainTypes, uniqueSubTypes } = useMemo(() => {
+        const brands = new Set<string>();
+        const mainTypes = new Set<string>();
+        const subTypes = new Set<string>();
+
+        items.forEach(item => {
+            if (item.brand) brands.add(item.brand);
+            if (item.mainType) mainTypes.add(item.mainType);
+            if (item.subType) subTypes.add(item.subType);
+        });
+
+        return {
+            uniqueBrands: Array.from(brands).sort(),
+            uniqueMainTypes: Array.from(mainTypes).sort(),
+            uniqueSubTypes: Array.from(subTypes).sort(),
+        };
+    }, [items]);
+
     const handleAddStock = async () => {
         if (!formData.itemName || !formData.brand || !formData.mainCode) {
             toast.error("Please fill in required fields (Item Name, Brand, Main Code)");
@@ -171,6 +214,9 @@ const StockReport = () => {
                 count: 1,
                 status: "Available"
             });
+            setBrandSearch("");
+            setMainTypeSearch("");
+            setSubTypeSearch("");
             toast.success("Stock added successfully");
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -189,24 +235,29 @@ const StockReport = () => {
 
     return (
         <RentalLayout title="Stock Report">
-            <div className="space-y-8 pb-12">
-                {/* Header Section */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="space-y-1">
-                        <h2 className="text-3xl font-black tracking-tight flex items-center gap-3">
-                            <BarChart2 className="h-8 w-8 text-primary" />
-                            Inventory Intelligence
-                        </h2>
-                        <p className="text-muted-foreground font-bold uppercase tracking-widest text-[10px] opacity-60">
-                            Real-time Stock Management & Analytics
-                        </p>
-                    </div>
+            <div className="space-y-4 pb-6 w-full">
+                {/* Header Section with Stats Navbar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <h2 className="text-2xl font-black tracking-tight flex items-center gap-3">
+                        <BarChart2 className="h-6 w-6 text-primary" />
+                        Stock Report
+                    </h2>
 
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                        setIsDialogOpen(open);
+                        if (!open) {
+                            setBrandSearch("");
+                            setMainTypeSearch("");
+                            setSubTypeSearch("");
+                            setOpenBrand(false);
+                            setOpenMainType(false);
+                            setOpenSubType(false);
+                        }
+                    }}>
                         <DialogTrigger asChild>
-                            <Button className="gradient-primary text-white font-black uppercase tracking-widest text-xs h-12 px-8 rounded-2xl shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all group">
-                                <Plus className="h-5 w-5 mr-2 group-hover:rotate-90 transition-transform duration-300" />
-                                Add New Stock
+                            <Button className="gradient-primary text-white font-black uppercase tracking-widest text-xs h-10 px-6 rounded-xl shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all group">
+                                <Plus className="h-4 w-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
+                                Add Stock
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-2xl bg-card/90 backdrop-blur-2xl border-white/10 rounded-[2rem] p-0 overflow-hidden">
@@ -230,32 +281,203 @@ const StockReport = () => {
 
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Brand</Label>
-                                    <Input
-                                        value={formData.brand}
-                                        onChange={e => setFormData({ ...formData, brand: e.target.value })}
-                                        className="bg-white/5 border-white/10 rounded-2xl h-14 px-6"
-                                        placeholder="Brand"
-                                    />
+                                    <Popover open={openBrand} onOpenChange={setOpenBrand}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={openBrand}
+                                                className="w-full justify-between bg-white/5 border-white/10 rounded-2xl h-14 px-6 hover:bg-white/10"
+                                            >
+                                                {formData.brand || "Select or type brand..."}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[200px] p-0 bg-card/95 backdrop-blur-xl border-white/10">
+                                            <Command className="bg-transparent" filter={() => 1}>
+                                                <CommandInput
+                                                    placeholder="Search or type brand..."
+                                                    className="border-none bg-transparent"
+                                                    value={brandSearch}
+                                                    onValueChange={setBrandSearch}
+                                                />
+                                                <CommandList>
+                                                    <CommandGroup>
+                                                        {uniqueBrands.filter(b => b.toLowerCase().includes(brandSearch.toLowerCase())).map((brand) => (
+                                                            <CommandItem
+                                                                key={brand}
+                                                                value={brand}
+                                                                onSelect={() => {
+                                                                    setFormData({ ...formData, brand });
+                                                                    setBrandSearch("");
+                                                                    setOpenBrand(false);
+                                                                }}
+                                                                className="cursor-pointer hover:bg-white/10"
+                                                            >
+                                                                <Check
+                                                                    className={cn(
+                                                                        "mr-2 h-4 w-4",
+                                                                        formData.brand === brand ? "opacity-100" : "opacity-0"
+                                                                    )}
+                                                                />
+                                                                {brand}
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                    {brandSearch && !uniqueBrands.some(b => b.toLowerCase() === brandSearch.toLowerCase()) && (
+                                                        <CommandGroup>
+                                                            <CommandItem
+                                                                value={brandSearch}
+                                                                onSelect={() => {
+                                                                    setFormData({ ...formData, brand: brandSearch });
+                                                                    setBrandSearch("");
+                                                                    setOpenBrand(false);
+                                                                }}
+                                                                className="cursor-pointer hover:bg-white/10 text-primary font-semibold"
+                                                            >
+                                                                <Plus className="mr-2 h-4 w-4" />
+                                                                Create "{brandSearch}"
+                                                            </CommandItem>
+                                                        </CommandGroup>
+                                                    )}
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Main Type</Label>
-                                    <Input
-                                        value={formData.mainType}
-                                        onChange={e => setFormData({ ...formData, mainType: e.target.value })}
-                                        className="bg-white/5 border-white/10 rounded-2xl h-14 px-6"
-                                        placeholder="Main Type"
-                                    />
+                                    <Popover open={openMainType} onOpenChange={setOpenMainType}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={openMainType}
+                                                className="w-full justify-between bg-white/5 border-white/10 rounded-2xl h-14 px-6 hover:bg-white/10"
+                                            >
+                                                {formData.mainType || "Select or type main type..."}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[200px] p-0 bg-card/95 backdrop-blur-xl border-white/10">
+                                            <Command className="bg-transparent" filter={() => 1}>
+                                                <CommandInput
+                                                    placeholder="Search or type type..."
+                                                    className="border-none bg-transparent"
+                                                    value={mainTypeSearch}
+                                                    onValueChange={setMainTypeSearch}
+                                                />
+                                                <CommandList>
+                                                    <CommandGroup>
+                                                        {uniqueMainTypes.filter(t => t.toLowerCase().includes(mainTypeSearch.toLowerCase())).map((type) => (
+                                                            <CommandItem
+                                                                key={type}
+                                                                value={type}
+                                                                onSelect={() => {
+                                                                    setFormData({ ...formData, mainType: type });
+                                                                    setMainTypeSearch("");
+                                                                    setOpenMainType(false);
+                                                                }}
+                                                                className="cursor-pointer hover:bg-white/10"
+                                                            >
+                                                                <Check
+                                                                    className={cn(
+                                                                        "mr-2 h-4 w-4",
+                                                                        formData.mainType === type ? "opacity-100" : "opacity-0"
+                                                                    )}
+                                                                />
+                                                                {type}
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                    {mainTypeSearch && !uniqueMainTypes.some(t => t.toLowerCase() === mainTypeSearch.toLowerCase()) && (
+                                                        <CommandGroup>
+                                                            <CommandItem
+                                                                value={mainTypeSearch}
+                                                                onSelect={() => {
+                                                                    setFormData({ ...formData, mainType: mainTypeSearch });
+                                                                    setMainTypeSearch("");
+                                                                    setOpenMainType(false);
+                                                                }}
+                                                                className="cursor-pointer hover:bg-white/10 text-primary font-semibold"
+                                                            >
+                                                                <Plus className="mr-2 h-4 w-4" />
+                                                                Create "{mainTypeSearch}"
+                                                            </CommandItem>
+                                                        </CommandGroup>
+                                                    )}
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 ml-1">Sub Type</Label>
-                                    <Input
-                                        value={formData.subType}
-                                        onChange={e => setFormData({ ...formData, subType: e.target.value })}
-                                        className="bg-white/5 border-white/10 rounded-2xl h-14 px-6"
-                                        placeholder="Sub Type"
-                                    />
+                                    <Popover open={openSubType} onOpenChange={setOpenSubType}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={openSubType}
+                                                className="w-full justify-between bg-white/5 border-white/10 rounded-2xl h-14 px-6 hover:bg-white/10"
+                                            >
+                                                {formData.subType || "Select or type sub type..."}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[200px] p-0 bg-card/95 backdrop-blur-xl border-white/10">
+                                            <Command className="bg-transparent" filter={() => 1}>
+                                                <CommandInput
+                                                    placeholder="Search or type type..."
+                                                    className="border-none bg-transparent"
+                                                    value={subTypeSearch}
+                                                    onValueChange={setSubTypeSearch}
+                                                />
+                                                <CommandList>
+                                                    <CommandGroup>
+                                                        {uniqueSubTypes.filter(t => t.toLowerCase().includes(subTypeSearch.toLowerCase())).map((type) => (
+                                                            <CommandItem
+                                                                key={type}
+                                                                value={type}
+                                                                onSelect={() => {
+                                                                    setFormData({ ...formData, subType: type });
+                                                                    setSubTypeSearch("");
+                                                                    setOpenSubType(false);
+                                                                }}
+                                                                className="cursor-pointer hover:bg-white/10"
+                                                            >
+                                                                <Check
+                                                                    className={cn(
+                                                                        "mr-2 h-4 w-4",
+                                                                        formData.subType === type ? "opacity-100" : "opacity-0"
+                                                                    )}
+                                                                />
+                                                                {type}
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                    {subTypeSearch && !uniqueSubTypes.some(t => t.toLowerCase() === subTypeSearch.toLowerCase()) && (
+                                                        <CommandGroup>
+                                                            <CommandItem
+                                                                value={subTypeSearch}
+                                                                onSelect={() => {
+                                                                    setFormData({ ...formData, subType: subTypeSearch });
+                                                                    setSubTypeSearch("");
+                                                                    setOpenSubType(false);
+                                                                }}
+                                                                className="cursor-pointer hover:bg-white/10 text-primary font-semibold"
+                                                            >
+                                                                <Plus className="mr-2 h-4 w-4" />
+                                                                Create "{subTypeSearch}"
+                                                            </CommandItem>
+                                                        </CommandGroup>
+                                                    )}
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
 
                                 <div className="space-y-2">
@@ -329,8 +551,8 @@ const StockReport = () => {
                     </Dialog>
                 </div>
 
-                {/* Statistics Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Statistics Navbar */}
+                <div className="flex flex-wrap gap-2 bg-card/30 backdrop-blur-xl border border-white/10 rounded-xl p-3">
                     {[
                         { label: "Fleet Capacity", value: groupedItems.reduce((acc, i) => acc + i.totalSum, 0), icon: Package, color: "text-blue-500", bg: "bg-blue-500/10" },
                         { label: "Ready to Deploy", value: groupedItems.reduce((acc, i) => acc + i.counts.Available, 0), icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-500/10" },
@@ -339,124 +561,113 @@ const StockReport = () => {
                     ].map((stat, i) => (
                         <motion.div
                             key={stat.label}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.1 }}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.05 }}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group flex-1 min-w-fit text-xs"
                         >
-                            <Card className="border-white/5 bg-card/40 backdrop-blur-xl group hover:scale-[1.02] transition-all duration-300 overflow-hidden relative">
-                                <div className={`absolute top-0 right-0 w-24 h-24 ${stat.bg} blur-[40px] -mr-12 -mt-12 opacity-50`} />
-                                <CardContent className="p-6">
-                                    <div className="flex items-center gap-4 mb-4">
-                                        <div className={`p-3 rounded-2xl ${stat.bg} ${stat.color} ring-1 ring-white/5 shadow-inner`}>
-                                            <stat.icon className="h-6 w-6" />
-                                        </div>
-                                        <TrendingUp className="h-4 w-4 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h3 className="text-3xl font-black tracking-tight">{stat.value}</h3>
-                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">{stat.label}</p>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <div className={`p-1 rounded ${stat.bg} ${stat.color}`}>
+                                <stat.icon className="h-3 w-3" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 leading-none">{stat.label}</p>
+                                <p className="text-base font-black text-primary leading-none">{stat.value}</p>
+                            </div>
                         </motion.div>
                     ))}
                 </div>
 
                 {/* Stock Table Section */}
-                <Card className="border-white/5 bg-card/20 backdrop-blur-xl shadow-2xl overflow-hidden rounded-[2rem]">
-                    <CardHeader className="p-8 pb-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div className="space-y-1">
-                                <CardTitle className="text-2xl font-black tracking-tight">Fleet Repository</CardTitle>
-                                <CardDescription className="text-sm font-medium opacity-60">Verified list of all physical assets in management.</CardDescription>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="relative group w-full md:w-80">
-                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                                    <Input
-                                        placeholder="Deep search assets..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-12 h-12 bg-white/5 border-white/5 focus:bg-white/10 rounded-2xl transition-all"
-                                    />
-                                </div>
-                                <Button variant="ghost" className="h-12 w-12 rounded-2xl hover:bg-white/10 border border-white/5">
-                                    <Filter className="h-5 w-5" />
-                                </Button>
+                <Card className="border-white/5 bg-card/20 backdrop-blur-xl shadow-2xl rounded-xl flex flex-col flex-1 min-w-0 w-full">
+                    <CardHeader className="px-4 py-3 pb-3 flex-shrink-0 border-b border-white/5 min-w-0 w-full">
+                        <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-base font-black tracking-tight truncate">Inventory Assets</h3>
+                            <div className="flex items-center gap-1 flex-1 max-w-xs">
+                                <Search className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                <Input
+                                    placeholder="Search..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-1.5 h-8 bg-white/5 border-white/5 focus:bg-white/10 rounded-lg transition-all text-xs w-full"
+                                />
                             </div>
                         </div>
                     </CardHeader>
 
-                    <CardContent className="p-0 overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-white/5">
-                                <TableRow className="border-white/5 hover:bg-transparent">
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50">S.No</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50">Item Name</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50">Brand</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50">Main Type</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50">Sub Type</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50">Description</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50">Main Code</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50">Sub Code</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50 text-center">Available</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50 text-center">Rented</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50 text-center">Damaged</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50 text-center">Repairing</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50 text-center">Expired</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50 text-center">Blocked</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50 text-center">Reserved</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50 text-center">Pending</TableHead>
-                                    <TableHead className="px-4 py-6 text-[10px] font-black uppercase tracking-widest opacity-50 text-center text-primary font-black">Total Sum</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <AnimatePresence mode="popLayout">
-                                    {isLoading ? (
-                                        [...Array(3)].map((_, i) => (
-                                            <TableRow key={i} className="animate-pulse border-white/5">
-                                                <TableCell colSpan={17} className="h-20 text-center opacity-20">Loading Database...</TableCell>
+                    <CardContent className="p-0 flex-1 flex flex-col min-h-0 min-w-0 w-full">
+                        <div className="overflow-x-auto overflow-y-hidden flex-1 min-h-0 min-w-0 w-full">
+                            <Table className="min-w-max text-xs w-full">
+                                <TableHeader className="bg-white/5 sticky top-0">
+                                    <TableRow className="border-white/5 hover:bg-transparent">
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">S.No</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">Item Name</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">Brand</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">Main Type</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">Sub Type</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">Description</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">Main Code</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap">Sub Code</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap text-center">Available</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap text-center">Rented</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap text-center">Damaged</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap text-center">Repairing</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap text-center">Expired</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap text-center">Blocked</TableHead>
+                                        <TableHead className="px-3 py-2 text-[11px] font-bold uppercase tracking-widest opacity-60 whitespace-nowrap text-center text-primary">Reserved</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody className="divide-y divide-white/5">
+                                    <AnimatePresence mode="popLayout">
+                                        {isLoading ? (
+                                            [...Array(3)].map((_, i) => (
+                                                <TableRow key={i} className="animate-pulse border-white/5">
+                                                    <TableCell colSpan={15} className="h-12 text-center opacity-20">Loading...</TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : filteredGroupedItems.length === 0 ? (
+                                            <TableRow className="border-white/5">
+                                                <TableCell colSpan={15} className="h-24 text-center">
+                                                    <div className="flex flex-col items-center gap-2 opacity-50">
+                                                        <Package className="h-6 w-6" />
+                                                        <p className="font-bold uppercase tracking-widest text-xs">No assets found</p>
+                                                    </div>
+                                                </TableCell>
                                             </TableRow>
-                                        ))
-                                    ) : filteredGroupedItems.length === 0 ? (
-                                        <TableRow className="border-white/5">
-                                            <TableCell colSpan={17} className="h-40 text-center">
-                                                <div className="flex flex-col items-center gap-2 opacity-50">
-                                                    <Package className="h-12 w-12" />
-                                                    <p className="font-bold uppercase tracking-widest text-xs">No assets found</p>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : filteredGroupedItems.map((item, idx) => (
-                                        <motion.tr
-                                            key={item.key}
-                                            initial={{ opacity: 0, x: -10 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{ delay: idx * 0.05 }}
-                                            className="border-white/5 hover:bg-white/5 transition-colors group"
-                                        >
-                                            <TableCell className="px-4 py-4 font-bold opacity-40">{idx + 1}</TableCell>
-                                            <TableCell className="px-4 py-4 font-black">{item.itemName}</TableCell>
-                                            <TableCell className="px-4 py-4 font-bold text-muted-foreground uppercase text-[10px]">{item.brand}</TableCell>
-                                            <TableCell className="px-4 py-4 text-[10px] uppercase font-black text-primary">{item.mainType}</TableCell>
-                                            <TableCell className="px-4 py-4 text-[10px] uppercase font-bold text-muted-foreground">{item.subType}</TableCell>
-                                            <TableCell className="px-4 py-4 text-[10px] max-w-[150px] truncate opacity-60">{item.description}</TableCell>
-                                            <TableCell className="px-4 py-4"><span className="text-[10px] font-black px-2 py-1 rounded bg-white/5 border border-white/5">{item.mainCode}</span></TableCell>
-                                            <TableCell className="px-4 py-4"><span className="text-[10px] font-black px-2 py-1 rounded bg-white/5 border border-white/5">{item.subCode}</span></TableCell>
-                                            <TableCell className="px-4 py-4 text-center font-bold text-emerald-500">{item.counts.Available}</TableCell>
-                                            <TableCell className="px-4 py-4 text-center font-bold text-blue-500">{item.counts.Rented}</TableCell>
-                                            <TableCell className="px-4 py-4 text-center font-bold text-rose-500">{item.counts.Damaged}</TableCell>
-                                            <TableCell className="px-4 py-4 text-center font-bold text-amber-500">{item.counts.Repairing}</TableCell>
-                                            <TableCell className="px-4 py-4 text-center font-bold text-slate-500">{item.counts.Expired}</TableCell>
-                                            <TableCell className="px-4 py-4 text-center font-bold text-red-600">{item.counts.Blocked}</TableCell>
-                                            <TableCell className="px-4 py-4 text-center font-bold text-indigo-500">{item.counts.Reserved}</TableCell>
-                                            <TableCell className="px-4 py-4 text-center font-bold text-orange-500">{item.counts.Pending}</TableCell>
-                                            <TableCell className="px-4 py-4 text-center font-black text-primary text-base">{item.totalSum}</TableCell>
-                                        </motion.tr>
-                                    ))}
-                                </AnimatePresence>
-                            </TableBody>
-                        </Table>
+                                        ) : filteredGroupedItems.map((item, idx) => (
+                                            <motion.tr
+                                                key={item.key}
+                                                initial={{ opacity: 0, x: -10 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: idx * 0.05 }}
+                                                className="border-white/5 hover:bg-white/5 transition-colors"
+                                            >
+                                                <TableCell className="px-3 py-2 font-bold opacity-50 whitespace-nowrap text-xs">{idx + 1}</TableCell>
+                                                <TableCell className="px-3 py-2 font-semibold whitespace-nowrap text-xs">{item.itemName}</TableCell>
+                                                <TableCell className="px-3 py-2 text-xs text-muted-foreground uppercase font-medium whitespace-nowrap">{item.brand}</TableCell>
+                                                <TableCell className="px-3 py-2 text-xs whitespace-nowrap">
+                                                    <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-primary font-semibold">{item.mainType}</span>
+                                                </TableCell>
+                                                <TableCell className="px-3 py-2 text-xs text-muted-foreground uppercase font-bold whitespace-nowrap">{item.subType}</TableCell>
+                                                <TableCell className="px-3 py-2 text-xs opacity-60 whitespace-nowrap max-w-[120px] truncate">{item.description}</TableCell>
+                                                <TableCell className="px-3 py-2 whitespace-nowrap">
+                                                    <span className="text-xs font-black px-1.5 py-0.5 rounded bg-white/5 border border-white/5">{item.mainCode}</span>
+                                                </TableCell>
+                                                <TableCell className="px-3 py-2 whitespace-nowrap">
+                                                    <span className="text-xs font-black px-1.5 py-0.5 rounded bg-white/5 border border-white/5">{item.subCode}</span>
+                                                </TableCell>
+                                                <TableCell className="px-3 py-2 text-center font-bold text-emerald-500 whitespace-nowrap text-xs">{item.counts.Available}</TableCell>
+                                                <TableCell className="px-3 py-2 text-center font-bold text-blue-500 whitespace-nowrap text-xs">{item.counts.Rented}</TableCell>
+                                                <TableCell className="px-3 py-2 text-center font-bold text-rose-500 whitespace-nowrap text-xs">{item.counts.Damaged}</TableCell>
+                                                <TableCell className="px-3 py-2 text-center font-bold text-amber-500 whitespace-nowrap text-xs">{item.counts.Repairing}</TableCell>
+                                                <TableCell className="px-3 py-2 text-center font-bold text-slate-500 whitespace-nowrap text-xs">{item.counts.Expired}</TableCell>
+                                                <TableCell className="px-3 py-2 text-center font-bold text-red-600 whitespace-nowrap text-xs">{item.counts.Blocked}</TableCell>
+                                                <TableCell className="px-3 py-2 text-center font-bold text-indigo-500 whitespace-nowrap text-xs">{item.counts.Reserved}</TableCell>
+                                            </motion.tr>
+                                        ))}
+                                    </AnimatePresence>
+                                </TableBody>
+                            </Table>
+                        </div>
                     </CardContent>
                 </Card>
             </div>

@@ -27,8 +27,8 @@ export function RentalLayout({ children, title }: RentalLayoutProps) {
 
                 <RentalSidebar />
 
-                <SidebarInset className="flex flex-col flex-1 bg-transparent">
-                    <header className="sticky top-0 z-40 border-b border-white/5 bg-card/20 backdrop-blur-3xl">
+                <SidebarInset className="flex flex-col flex-1 min-w-0 bg-transparent w-full">
+                    <header className="sticky top-0 z-40 border-b border-white/5 bg-card/20 backdrop-blur-3xl w-full">
                         <div className="flex h-20 items-center justify-between px-8">
                             <div className="flex items-center gap-6">
                                 <div className="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/5 shadow-inner">
